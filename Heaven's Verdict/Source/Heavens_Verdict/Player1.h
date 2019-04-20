@@ -2,6 +2,7 @@
 
 #pragma once
 
+
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
 #include "Player1.generated.h"
@@ -14,6 +15,14 @@ class HEAVENS_VERDICT_API APlayer1 : public APawn
 public:
 	// Sets default values for this pawn's properties
 	APlayer1();
+
+
+	//The players health value
+	float health = 100;
+
+	//How much meter/special bar they have
+	float meter;
+
 
 	//The speed of which the player travels on the X axis
 	float speedX;
@@ -33,7 +42,7 @@ public:
 	bool isGrounded;
 
 	//If the player is facing the left or right
-	bool isFacingLeft;
+	bool isFacingLeft = false;
 
 	//If the player is actually air dashing
 	UPROPERTY(VisibleAnywhere)
@@ -46,7 +55,30 @@ public:
 	FVector currentVelocity;
 
 	//What checks to see if the player has already shot their fireball.
-	bool fireBallFired = false;
+	bool fireBallFired = true;
+	//Checks to see if the player hasn't already expended their singular air dash
+	UPROPERTY(VisibleAnywhere)
+		bool canAirdash = false;
+
+	//Checks to see if the fireball is dead.
+	bool fireballDead;
+
+	//Meant to mimic how the fireball timer works
+	int fireballLifeSpan = 600;
+
+	FTimerHandle countdownTimerHandle;
+
+	void AdvanceTimer();
+	
+	void CountdownHasFinished();
+
+	int hitboxLifeSpan = 100;
+
+	void AdvanceHitboxTimer();
+
+	void hitboxFinished();
+
+	bool isBlocked = false;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -61,12 +93,27 @@ protected:
 	//The Camera that we're using
 	UPROPERTY(EditAnywhere)
 		class UCameraComponent* theCamera;
+	//Records the player location
+	UPROPERTY(EditAnywhere)
+		FVector playerLocation;
+	//The fireball spawn point
+	UPROPERTY(EditAnywhere)
+		FVector fireballSpawn;
 
 	UPROPERTY(EditAnywhere)
-		class UBoxComponent* projectileSpawnPoint;
+		FVector hitboxLocation;
 
-	TSubclassOf<class AFireBall> fireballClass;
+	//What will allow us to chose what we want to spawn.
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class AFireBall> toSpawn;
 
+	UPROPERTY(EditAnywhere)
+		class UBoxComponent* activeHitbox;
+	
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class AHitbox> hitbox;
+	UPROPERTY(EditAnywhere)
+	bool isHitboxActive;
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -89,6 +136,18 @@ public:
 	//The method that sets the "is airdashing variable" to true. 
 	void AirDash();
 
+	void AirDashB();
 	//The method that handles the base functionality of the special button. Would be different for each player and made virtual in the future.
 	void specialButton();
+
+	//This method will be called in the blueprint
+	UFUNCTION(BlueprintCallable)
+		void TakeDamage(bool isBlocked_);
+	//Method for the attack hitbox
+	UFUNCTION()
+		void AttackButton();
+
+	//Boolean to check if the player wants to airdash left
+	bool airDashLeft;
+
 };

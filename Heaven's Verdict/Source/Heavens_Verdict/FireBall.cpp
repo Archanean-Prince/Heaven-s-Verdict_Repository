@@ -3,6 +3,7 @@
 #include "FireBall.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 // Sets default values
 AFireBall::AFireBall()
@@ -18,7 +19,7 @@ AFireBall::AFireBall()
 	RootComponent->SetupAttachment(mCollisionBox);
 
 	//Creates the collision box to be of a specific size
-	mCollisionBox->InitBoxExtent(FVector(5,5, 5));
+	mCollisionBox->InitBoxExtent(FVector(20,20, 20));
 	//and places it in a specific area
 	mCollisionBox->SetRelativeLocation(FVector(0, 0, 0));
 	//This creates the static mesh component
@@ -34,9 +35,12 @@ AFireBall::AFireBall()
 	myMesh->SetRelativeLocation(FVector().ZeroVector);
 	//Moves it slightly downards to better fit it
 	myMesh->SetRelativeScale3D(FVector(0.5, 0.5, 0.5));
+	myMesh->SetRelativeLocation(FVector(0, 0, -30));
 
+	
+	RootComponent = mCollisionBox;
 	//Gives it the fireball tag so it can be recognized as a fireball
-	mCollisionBox->ComponentTags.Add(FName("Floor"));
+	mCollisionBox->ComponentTags.Add(FName("fireball"));
 
 }
 
@@ -45,8 +49,29 @@ void AFireBall::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	currentVelocity.Y = FMath::Clamp(defaultValue, -1.0f, 1.0f) * 500.0f;
 		
+}
+
+void AFireBall::AdvanceTimer()
+{
+	--fireballLifeSpan;
+	if (fireballLifeSpan < 0) {
+		//GetWorldTimerManager().ClearTimer(countdownTimerHandle);
+		CountDownHasFinished();
+	}
+}
+
+void AFireBall::CountDownHasFinished()
+{
+	Destroy();
+	UE_LOG(LogTemp, Warning, TEXT("Fireball is dead!"));
+	fireballDead = true;
+}
+
+bool AFireBall::GetFireballStatus()
+{
+
+	return fireballDead;
 }
 
 // Called every frame
@@ -54,6 +79,7 @@ void AFireBall::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	AdvanceTimer();
 
 	// The important part that lets the fireball move forward. Is called on startup.
 	if (!currentVelocity.IsZero())

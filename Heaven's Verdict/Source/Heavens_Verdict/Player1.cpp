@@ -5,10 +5,16 @@
 #include "Components/BoxComponent.h"
 #include "Components/InputComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "FireBall.h"
 #include "Engine/World.h"
+#include "Runtime/Engine/Classes/Engine/Engine.h"
 #include "DrawDebugHelpers.h"
 #include "Camera/CameraComponent.h"
+#include "Components/TimelineComponent.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "Engine/Public/TimerManager.h"
+#include "FireBall.h"
+#include "Hitbox.h"
+
 // Sets default values
 APlayer1::APlayer1()
 {
@@ -46,20 +52,20 @@ APlayer1::APlayer1()
 	//Sets up the camera to be a specific distance away. Yet to function properly like a normal fighter
 	theCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	theCamera->SetupAttachment(RootComponent);
-	theCamera->SetRelativeLocation(FVector(-470.0f, 110.0f, 0.0f));
+	theCamera->SetRelativeLocation(FVector(-640.0f, 450.0f, 130.0f));
 	
 
-
+	mCollisionBox->ComponentTags.Add(FName("Player"));
 	//Make sure this parts go last part go last!
 	RootComponent = mCollisionBox;
 }
+
 
 // Called when the game starts or when spawned
 void APlayer1::BeginPlay()
 {
 
 	Super::BeginPlay();
-	
 }
 
 // Called every frame
@@ -67,21 +73,69 @@ void APlayer1::Tick(float DeltaTime)
 {
 
 	Super::Tick(DeltaTime);
+	
+	//What the players current location is, used to determine the fireball starting position
+	playerLocation = GetActorLocation();
+
+	if (isBlocked) {
+		currentVelocity.Y = 0;
+	}
+	//The bottom three vectors are to determine where the fireball will spawn
+	if (!isFacingLeft) {
+		//All the code below generates the spawn points for the fireball and the hitbox itself
 
 
-	//DrawDebugPoint(GetWorld(), projectileSpawnPoint, 20, FColor(255, 0, 255), false, 0.03);
+		fireballSpawn.Y = playerLocation.Y + 150;
 
+		fireballSpawn.X = playerLocation.X -30;
+
+		fireballSpawn.Z = playerLocation.Z;
+
+
+		hitboxLocation.Y = playerLocation.Y + 100;
+
+		hitboxLocation.X = playerLocation.X -30;
+
+		hitboxLocation.Z = playerLocation.Z;
+
+	}
+	else if (isFacingLeft) {
+		fireballSpawn.Y = playerLocation.Y - 150;
+
+		fireballSpawn.X = playerLocation.X - 30;
+
+		fireballSpawn.Z = playerLocation.Z;
+	}
+
+
+
+	if (GEngine) {
+		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("Player Location: %s"), *playerLocation.ToString()));
+		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, FString::Printf(TEXT("Player Fireball : %s"), *fireballSpawn.ToString()));
+		//Draws the debug box so I can know where the fireball would spawn
+		DrawDebugBox(GetWorld(), fireballSpawn, FVector(40, 40, 40), FColor::Purple, false, 0.3f, 0, 2);
+		DrawDebugBox(GetWorld(), hitboxLocation, FVector(45, 45, 45), FColor::Blue, false, 0.3f, 0, 2);
+
+	}
+	//If the fireball has fired, start the timer so it can "reload"
+	if (!fireBallFired) {
+		AdvanceTimer();
+	}
+	//Similar to the fireball but much shorter
+	if (!isHitboxActive) {
+		AdvanceHitboxTimer();
+	}
 	//If the player is grounded, set them still
 	if (isGrounded) {
 		currentVelocity.Z = 0;
 	}
 	else if (isAirdashing) {
-		UE_LOG(LogTemp, Warning, TEXT("Startin air dash"));
+		//UE_LOG(LogTemp, Warning, TEXT("Startin air dash"));
 		//Air dash has started, make them move.
 		if (abs(airDashStart.Y - GetActorLocation().Y) <=120) {
 			jumpTimer = 0;
 			currentVelocity.Z += -currentVelocity.Z;
-			if (isFacingLeft) {
+			if (airDashLeft) {
 				currentVelocity.Y = FMath::Clamp(defaultValue, -1.0f, 1.0f) * -500.0f;
 			}
 			else {
@@ -90,8 +144,9 @@ void APlayer1::Tick(float DeltaTime)
 		}
 		//Air dash is done, make them fall now.
 		else if (abs(airDashStart.Y - GetActorLocation().Y) >= 120) {
-			UE_LOG(LogTemp, Warning, TEXT("Reached End of Airdash"));
+			//UE_LOG(LogTemp, Warning, TEXT("Reached End of Airdash"));
 			isAirdashing = false;
+			airDashLeft = false;
 			currentVelocity.Z = FMath::Clamp(defaultValue, 1.0f, 1.0f) * -300.0f;
 			currentVelocity.Y = FMath::Clamp(defaultValue, -1.0f, 1.0f) * 0.0f;
 		}
@@ -128,9 +183,16 @@ void APlayer1::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &APlayer1::Jump);
 
 	//The method that checks if the player double taps, causing them to air dash forward but only if they're airborne.
-	PlayerInputComponent->BindAction("AirDash", IE_DoubleClick, this, &APlayer1::AirDash);
-
+	PlayerInputComponent->BindAction("AirDashF", IE_DoubleClick, this, &APlayer1::AirDash);
+	//Bindings for the backwards air dash
+	PlayerInputComponent->BindAction("AirDashB", IE_DoubleClick, this, &APlayer1::AirDashB);
+	//Bindings for the special button
 	PlayerInputComponent->BindAction("Special", IE_Pressed, this, &APlayer1::specialButton);
+
+	//binding for the attack button
+	PlayerInputComponent->BindAction("Attack", IE_Pressed, this, &APlayer1::AttackButton);
+
+
 }
 
 void APlayer1::OnOverlapBegin(UPrimitiveComponent * OverlappedComp, AActor * OtherActor, UPrimitiveComponent * OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult)
@@ -139,8 +201,22 @@ void APlayer1::OnOverlapBegin(UPrimitiveComponent * OverlappedComp, AActor * Oth
 	//If the player collides with another object that has the tag of floor, say that you collided with it.
 	if (OtherComp->ComponentHasTag("Floor")) {
 		isGrounded = true;
-		UE_LOG(LogTemp, Warning, TEXT("Oh shit we collided with something"));
+		canAirdash = true;
+		//UE_LOG(LogTemp, Warning, TEXT("Oh shit we collided with something"));
 	}
+	if (OtherComp->ComponentHasTag("fireball")) {
+		if (currentVelocity.Y == 0) {
+			//UE_LOG(LogTemp, Warning, TEXT("Blocked"));
+			TakeDamage(true);
+		}
+		TakeDamage(false);
+
+	}
+	if (OtherComp->ComponentHasTag("Obstacle")) {
+		isBlocked = true;
+		//UE_LOG(LogTemp, Warning, TEXT("Cannot Proceed!"));
+	}
+
 	//UE_LOG(LogTemp, Warning, TEXT("Oh shit we collided with something"));
 }
 
@@ -157,22 +233,108 @@ void APlayer1::Jump()
 	if (isGrounded) {
 		jumpTimer = jumpMaximum;
 		isGrounded = false;
-		UE_LOG(LogTemp, Warning, TEXT("Supposed to be jumping"));
+		//UE_LOG(LogTemp, Warning, TEXT("Supposed to be jumping"));
 	}
 
 }
 
 void APlayer1::AirDash() {
-	isAirdashing = true;
-	airDashStart.Y = GetActorLocation().Y;
-	UE_LOG(LogTemp, Warning, TEXT("Supposed to be air dashing"));
+		
+	if (canAirdash == true) {
+		isAirdashing = true;
+		//Sets the players ability to airdash as false
+		canAirdash = false;
+		airDashStart.Y = GetActorLocation().Y;
+		//UE_LOG(LogTemp, Warning, TEXT("Supposed to be air dashing"));
+	}
+	else {
+		//UE_LOG(LogTemp, Warning, TEXT("Cannot airdash!"));
+	}
+}
+
+void APlayer1::AirDashB()
+{
+	if (canAirdash == true) {
+		isAirdashing = true;
+		airDashLeft = true;
+		//Sets the players ability to airdash as false
+		canAirdash = false;
+		airDashStart.Y = GetActorLocation().Y;
+		//UE_LOG(LogTemp, Warning, TEXT("Supposed to be air dashing"));
+	}
+	else {
+		//UE_LOG(LogTemp, Warning, TEXT("Cannot airdash!"));
+	}
 }
 
 void APlayer1::specialButton()
 {
-	fireBallFired = true;
+	if (fireBallFired) {
+		fireBallFired = false;
+		AFireBall* newFireball = GetWorld()->SpawnActor<AFireBall>(toSpawn, fireballSpawn, FRotator::ZeroRotator);
+		
+		if (isFacingLeft) {
+			newFireball->currentVelocity.Y= FMath::Clamp(defaultValue, -1.0f, 1.0f) * -500.0f;
+		}
+		else if (!isFacingLeft) {
+			newFireball->currentVelocity.Y = FMath::Clamp(defaultValue, -1.0f, 1.0f) * 500.0f;
+		}
+		//for some reason made them opposites. False mean cannot be fired, true means can be fired.
+		fireBallFired = false;
+	}else if (!fireBallFired)
+	{
+		//UE_LOG(LogTemp, Warning, TEXT("fireball already fired!"));
+	}
+	//UE_LOG(LogTemp, Warning, TEXT("Special button pressed!"));
+}
 
-	//AFireBall* newFireball = GetWorld()->SpawnActor<AFireBall>(GetClass(), projectileSpawnLocation, FRotator::ZeroRotator);
+void APlayer1::TakeDamage(bool isBlocked)
+{
+	if (isBlocked) {
+		health = health - 10;
+	}
+	else {
+		health= health - 30;
+	}
+}
 	
-	UE_LOG(LogTemp, Warning, TEXT("Special button pressed!"));
+void APlayer1::AdvanceTimer()
+{
+	--fireballLifeSpan;
+	if (fireballLifeSpan < 0) {
+		CountdownHasFinished();
+		//UE_LOG(LogTemp, Warning, TEXT("Fireball restored!"));
+	}
+}
+
+void APlayer1::CountdownHasFinished()
+{
+	fireballDead = true;
+	fireBallFired = true;
+}
+
+
+void APlayer1::AttackButton() {
+
+	if (isHitboxActive) {
+		AHitbox* activeHitbox = GetWorld()->SpawnActor<AHitbox>(hitbox, hitboxLocation, FRotator::ZeroRotator);
+		//UE_LOG(LogTemp, Warning, TEXT("Punch!"));
+	}
+	else {
+		//UE_LOG(LogTemp, Warning, TEXT("Punch on CD"));
+	}
+}
+
+void APlayer1::AdvanceHitboxTimer()
+{
+	--hitboxLifeSpan;
+	if (hitboxLifeSpan< 0) {
+		hitboxFinished();
+		//UE_LOG(LogTemp, Warning, TEXT("Hitbox restored!"));
+	}
+}
+
+void APlayer1::hitboxFinished()
+{
+	isHitboxActive = true;
 }

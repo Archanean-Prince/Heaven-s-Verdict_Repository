@@ -21,10 +21,10 @@ public:
 	//Some filler variable to save me some time.
 	float defaultValue = 1;
 
+	bool fireballDead;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-
 
 	//The Mesh Component 
 	UPROPERTY(EditAnywhere)
@@ -33,8 +33,17 @@ protected:
 	UPROPERTY(EditAnywhere)
 		class UBoxComponent* mCollisionBox;
 
+	int fireballLifeSpan = 200;
+
+	void AdvanceTimer();
+
+	void CountDownHasFinished();
+
+	FTimerHandle countdownTimerHandle;
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-
+	
+	bool GetFireballStatus();
 };

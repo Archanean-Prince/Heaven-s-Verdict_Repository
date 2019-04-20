@@ -18,7 +18,7 @@ AStage::AStage()
 	RootComponent->SetupAttachment(mCollisionBox);
 
 	//Creates the collision box to be of a specific size
-	mCollisionBox->InitBoxExtent(FVector(100, 250, 20));
+	mCollisionBox->InitBoxExtent(FVector(150, 230, 50));
 	//and places it in a specific area
 	mCollisionBox->SetRelativeLocation(FVector(0, 0, 60));
 	//This creates the static mesh component
