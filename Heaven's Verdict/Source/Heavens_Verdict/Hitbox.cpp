@@ -20,7 +20,7 @@ AHitbox::AHitbox()
 	RootComponent->SetupAttachment(mCollisionBox);
 
 	//Creates the collision box to be of a specific size
-	mCollisionBox->InitBoxExtent(FVector(20, 20, 20));
+	mCollisionBox->InitBoxExtent(FVector(45, 45, 45));
 	//and places it in a specific area
 	mCollisionBox->SetRelativeLocation(FVector(0, 0, 0));
 

@@ -30,9 +30,21 @@ APlayer1::APlayer1()
 
 	//Where the hitbox is created, initialized in it's size and then attached to the root component as well.
 	mCollisionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("Hitbox"));
-	RootComponent->SetupAttachment(mCollisionBox);
-	mCollisionBox->InitBoxExtent(FVector(40, 40, 40));
+
+	blockBox = CreateDefaultSubobject<UBoxComponent>(TEXT("BlockBox"));
+
+	RootComponent->SetupAttachment(blockBox);
+
+	blockBox->InitBoxExtent(FVector(80, 80, 70));
+
+	blockBox->ComponentHasTag(FName("BlockBox"));
 	
+
+	RootComponent->SetupAttachment(mCollisionBox);
+
+	mCollisionBox->InitBoxExtent(FVector(40, 40, 40));
+
+	blockBox->SetupAttachment(mCollisionBox);
 
 	//Where the mesh is initialized, and then attached to the root component
 	myMesh = CreateAbstractDefaultSubobject<UStaticMeshComponent>(TEXT("Static Mesh Component"));
@@ -49,6 +61,9 @@ APlayer1::APlayer1()
 	//The method below is called when the hitbox collide with another object who also has a box collider.
 	mCollisionBox->OnComponentBeginOverlap.AddDynamic(this, &APlayer1::OnOverlapBegin);
 
+
+	//blockBox->OnComponentBeginOverlap.AddDynamic(this, &APlayer1::OnOverlapBegin);
+
 	//Sets up the camera to be a specific distance away. Yet to function properly like a normal fighter
 	theCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	theCamera->SetupAttachment(RootComponent);
@@ -58,6 +73,7 @@ APlayer1::APlayer1()
 	mCollisionBox->ComponentTags.Add(FName("Player"));
 	//Make sure this parts go last part go last!
 	RootComponent = mCollisionBox;
+
 }
 
 
@@ -68,53 +84,17 @@ void APlayer1::BeginPlay()
 	Super::BeginPlay();
 }
 
+
 // Called every frame
 void APlayer1::Tick(float DeltaTime)
 {
 
 	Super::Tick(DeltaTime);
 	
-	//What the players current location is, used to determine the fireball starting position
-	playerLocation = GetActorLocation();
-
-	if (isBlocked) {
-		currentVelocity.Y = 0;
-	}
-	//The bottom three vectors are to determine where the fireball will spawn
-	if (!isFacingLeft) {
-		//All the code below generates the spawn points for the fireball and the hitbox itself
-
-
-		fireballSpawn.Y = playerLocation.Y + 150;
-
-		fireballSpawn.X = playerLocation.X -30;
-
-		fireballSpawn.Z = playerLocation.Z;
-
-
-		hitboxLocation.Y = playerLocation.Y + 100;
-
-		hitboxLocation.X = playerLocation.X -30;
-
-		hitboxLocation.Z = playerLocation.Z;
-
-	}
-	else if (isFacingLeft) {
-		fireballSpawn.Y = playerLocation.Y - 150;
-
-		fireballSpawn.X = playerLocation.X - 30;
-
-		fireballSpawn.Z = playerLocation.Z;
-	}
-
-
-
+	
 	if (GEngine) {
 		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("Player Location: %s"), *playerLocation.ToString()));
 		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, FString::Printf(TEXT("Player Fireball : %s"), *fireballSpawn.ToString()));
-		//Draws the debug box so I can know where the fireball would spawn
-		DrawDebugBox(GetWorld(), fireballSpawn, FVector(40, 40, 40), FColor::Purple, false, 0.3f, 0, 2);
-		DrawDebugBox(GetWorld(), hitboxLocation, FVector(45, 45, 45), FColor::Blue, false, 0.3f, 0, 2);
 
 	}
 	//If the fireball has fired, start the timer so it can "reload"
@@ -205,17 +185,12 @@ void APlayer1::OnOverlapBegin(UPrimitiveComponent * OverlappedComp, AActor * Oth
 		//UE_LOG(LogTemp, Warning, TEXT("Oh shit we collided with something"));
 	}
 	if (OtherComp->ComponentHasTag("fireball")) {
-		if (currentVelocity.Y == 0) {
-			//UE_LOG(LogTemp, Warning, TEXT("Blocked"));
-			TakeDamage(true);
-		}
-		TakeDamage(false);
+		
+		
+		//HIGHLY EXPERIMENTAL LINE BELOW
+		//currentVelocity.Y = FMath::Clamp(defaultValue, -40.0f, 1.0f) * -1000.0f;
+	}
 
-	}
-	if (OtherComp->ComponentHasTag("Obstacle")) {
-		isBlocked = true;
-		//UE_LOG(LogTemp, Warning, TEXT("Cannot Proceed!"));
-	}
 
 	//UE_LOG(LogTemp, Warning, TEXT("Oh shit we collided with something"));
 }
@@ -269,10 +244,29 @@ void APlayer1::AirDashB()
 
 void APlayer1::specialButton()
 {
+	playerLocation = GetActorLocation();
+
+	if (!isFacingLeft) {
+		//All the code below generates the spawn points for the fireball and the hitbox itself
+
+
+		fireballSpawn.Y = playerLocation.Y + 150;
+
+		fireballSpawn.X = playerLocation.X - 30;
+
+		fireballSpawn.Z = playerLocation.Z;
+
+	}
+
 	if (fireBallFired) {
+
 		fireBallFired = false;
+
 		AFireBall* newFireball = GetWorld()->SpawnActor<AFireBall>(toSpawn, fireballSpawn, FRotator::ZeroRotator);
+
 		
+		//DrawDebugBox(GetWorld(), fireballSpawn, FVector(40, 40, 40), FColor::Purple, false, 0.3f, 0, 2);
+
 		if (isFacingLeft) {
 			newFireball->currentVelocity.Y= FMath::Clamp(defaultValue, -1.0f, 1.0f) * -500.0f;
 		}
@@ -281,21 +275,17 @@ void APlayer1::specialButton()
 		}
 		//for some reason made them opposites. False mean cannot be fired, true means can be fired.
 		fireBallFired = false;
+
 	}else if (!fireBallFired)
 	{
-		//UE_LOG(LogTemp, Warning, TEXT("fireball already fired!"));
+		UE_LOG(LogTemp, Warning, TEXT("fireball already fired!"));
 	}
 	//UE_LOG(LogTemp, Warning, TEXT("Special button pressed!"));
 }
 
 void APlayer1::TakeDamage(bool isBlocked)
 {
-	if (isBlocked) {
-		health = health - 10;
-	}
-	else {
-		health= health - 30;
-	}
+	
 }
 	
 void APlayer1::AdvanceTimer()
@@ -315,8 +305,20 @@ void APlayer1::CountdownHasFinished()
 
 
 void APlayer1::AttackButton() {
+	playerLocation = GetActorLocation();
 
 	if (isHitboxActive) {
+		if (!isFacingLeft) {
+			//All the code below generates the spawn points for the fireball and the hitbox itself
+			hitboxLocation.Y = playerLocation.Y + 100;
+
+			hitboxLocation.X = playerLocation.X - 30;
+
+			hitboxLocation.Z = playerLocation.Z;
+
+			DrawDebugBox(GetWorld(), hitboxLocation, FVector(45,45,45), FColor::Blue, false, 0.5f, 0, 2);
+		}
+
 		AHitbox* activeHitbox = GetWorld()->SpawnActor<AHitbox>(hitbox, hitboxLocation, FRotator::ZeroRotator);
 		//UE_LOG(LogTemp, Warning, TEXT("Punch!"));
 	}

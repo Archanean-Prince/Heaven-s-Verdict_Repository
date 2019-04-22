@@ -14,6 +14,9 @@ class HEAVENS_VERDICT_API AHitbox : public AActor
 public:	
 	// Sets default values for this actor's properties
 	AHitbox();
+
+	AHitbox(bool low_);
+
 	UPROPERTY(EditAnywhere)
 		class UBoxComponent* mCollisionBox;
 

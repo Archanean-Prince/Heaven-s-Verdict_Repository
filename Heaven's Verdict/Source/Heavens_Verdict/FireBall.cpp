@@ -4,6 +4,8 @@
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "TimerManager.h"
+#include "Runtime/Engine/Classes/Engine/Engine.h"
+#include "DrawDebugHelpers.h"
 #include "UObject/ConstructorHelpers.h"
 // Sets default values
 AFireBall::AFireBall()
@@ -19,7 +21,7 @@ AFireBall::AFireBall()
 	RootComponent->SetupAttachment(mCollisionBox);
 
 	//Creates the collision box to be of a specific size
-	mCollisionBox->InitBoxExtent(FVector(20,20, 20));
+	mCollisionBox->InitBoxExtent(FVector(40,40, 40));
 	//and places it in a specific area
 	mCollisionBox->SetRelativeLocation(FVector(0, 0, 0));
 	//This creates the static mesh component
@@ -74,11 +76,19 @@ bool AFireBall::GetFireballStatus()
 	return fireballDead;
 }
 
+void AFireBall::OnOverlapBegin(UPrimitiveComponent * OverlappedComp, AActor * OtherActor, UPrimitiveComponent * OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult)
+{
+	if (OtherComp->ComponentHasTag("Player")) {
+		Destroy();
+	}
+}
+
 // Called every frame
 void AFireBall::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	DrawDebugBox(GetWorld(), GetActorLocation(), FVector(45, 45, 45), FColor::Purple, false, 0.05f, 0, 2);
 	AdvanceTimer();
 
 	// The important part that lets the fireball move forward. Is called on startup.

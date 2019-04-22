@@ -64,7 +64,7 @@ public:
 	bool fireballDead;
 
 	//Meant to mimic how the fireball timer works
-	int fireballLifeSpan = 600;
+	int fireballLifeSpan = 100;
 
 	FTimerHandle countdownTimerHandle;
 
@@ -78,7 +78,7 @@ public:
 
 	void hitboxFinished();
 
-	bool isBlocked = false;
+	bool proximityBlocking = false;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -99,9 +99,12 @@ protected:
 	//The fireball spawn point
 	UPROPERTY(EditAnywhere)
 		FVector fireballSpawn;
-
+	//Where the hitbox will spawn
 	UPROPERTY(EditAnywhere)
 		FVector hitboxLocation;
+
+	UPROPERTY(EditAnywhere)
+		class UBoxComponent* blockBox;
 
 	//What will allow us to chose what we want to spawn.
 	UPROPERTY(EditAnywhere)
@@ -113,6 +116,8 @@ protected:
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class AHitbox> hitbox;
 	UPROPERTY(EditAnywhere)
+
+
 	bool isHitboxActive;
 public:	
 	// Called every frame
@@ -146,6 +151,7 @@ public:
 	//Method for the attack hitbox
 	UFUNCTION()
 		void AttackButton();
+
 
 	//Boolean to check if the player wants to airdash left
 	bool airDashLeft;
