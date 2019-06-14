@@ -9,11 +9,12 @@
 #include "Runtime/Engine/Classes/Engine/Engine.h"
 #include "DrawDebugHelpers.h"
 #include "Camera/CameraComponent.h"
-#include "Components/TimelineComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Engine/Public/TimerManager.h"
 #include "FireBall.h"
 #include "Hitbox.h"
+#include "Components/TimelineComponent.h"
+#include "Engine/Classes/Curves/CurveFloat.h"
 
 
 // Sets default values
@@ -77,12 +78,31 @@ APlayer1::APlayer1()
 	fullHealth = 1000.0f;
 
 	//Your health is full at the start of it
-	health = fullHealth;
+	Health = fullHealth;
 
 	//Is one to represent full health
 	healthPercentage = 1;
 
+	bCanBeDamaged = true;
 
+	fullMeter = 100.0f;
+	
+	Meter = fullMeter;
+
+	prevMeterValue = meterPercentage;
+
+	meterValue = 0.0f;
+
+	canUseMeter = true;
+
+	if (meterCurve) {
+		FOnTimelineFloat TimelineCallback;
+		FOnTimelineEventStatic TimelineFinishedCallback;
+		TimelineCallback.BindUFunction(this, FName("SetMeterValue"));
+		TimelineFinishedCallback.BindUFunction(this, FName("SetMeterState"));
+		myTimeline.AddInterpFloat(meterCurve, TimelineCallback);
+		myTimeline.SetTimelineFinishedFunc(TimelineFinishedCallback);
+	}
 
 
 
@@ -106,7 +126,9 @@ void APlayer1::Tick(float DeltaTime)
 {
 
 	Super::Tick(DeltaTime);
-	
+
+	//Where the timeline is connected
+	myTimeline.TickTimeline(DeltaTime);
 	//PrintOnScreen(1);
 	
 	if (GEngine) {
@@ -202,6 +224,10 @@ void APlayer1::OnOverlapBegin(UPrimitiveComponent * OverlappedComp, AActor * Oth
 		//UE_LOG(LogTemp, Warning, TEXT("Oh shit we collided with something"));
 	}
 	if (OtherComp->ComponentHasTag("fireball")) {
+		float DamageValue = 20;
+		UpdateHealth(-DamageValue);
+		//Sets up the player invincibility timer to be damaged again.
+		DamageTimer();
 	}
 
 
@@ -319,8 +345,7 @@ void APlayer1::AttackButton() {
 	//Sets the current hitbox instance to be true and thus active
 	hitboxInstance->isActive = true;
 	
-	if (isHitboxActive) {
-		//Below is what would be theoretically used if the player faced left or right
+	if (isHitboxActive && !FMath::IsNearlyZero(Meter, 0.001f) && canUseMeter) {
 		if (!isFacingLeft) {
 			//All the code below generates the spawn points for the fireball and the hitbox itself
 			hitboxInstance->SetActorLocation(FVector(GetActorLocation().X-30,GetActorLocation().Y+100,GetActorLocation().Z));
@@ -339,8 +364,14 @@ void APlayer1::AttackButton() {
 		//UE_LOG(LogTemp, Warning, TEXT("Punch!"));
 	}
 	else {
-		//UE_LOG(LogTemp, Warning, TEXT("Punch on CD"));
+		UE_LOG(LogTemp, Warning, TEXT("You're out of meter (test case)"));
 	}
+	//Stops the timeline if it's already moving to not run twice
+	myTimeline.Stop();
+	GetWorldTimerManager().ClearTimer(memberTimerHandle);
+	SetMeterChange(-20.0f);
+	//The timer handler, followed by what is being changed, the method to run, over how long and to not loop.
+	GetWorldTimerManager().SetTimer(memberTimerHandle, this, &APlayer1::UpdateMeter, 5.0f, false);
 }
 
 void APlayer1::AdvanceHitboxTimer()
@@ -357,53 +388,124 @@ void APlayer1::hitboxFinished()
 	isHitboxActive = true;
 }
 
-
-
+//What is telling how much health it has to the UI
 float APlayer1::GetHealth()
 {
-	return 0.0f;
+	return healthPercentage;
 }
 
 FText APlayer1::GetHealthIntText()
 {
-	return FText();
+	//Converts it to an integer and rounds it
+	int32 HP = FMath::RoundHalfToZero(healthPercentage * 100);
+
+	//Converts it to a string
+	FString HPS = FString::FromInt(HP);
+
+	FString healthHUD = HPS + FString(TEXT("%"));
+
+	//Finally converts it into a string to then be returned
+	FText HPText = FText::FromString(healthHUD);
+
+	return HPText;
 }
 
 float APlayer1::GetMeter()
 {
-	return 0.0f;
+	return meterPercentage;
 }
 
 FText APlayer1::GetMeterIntText()
 {
-	return FText();
+	// Converts it to an integer and rounds it
+	int32 METER = FMath::RoundHalfToZero(meterPercentage * 100);
+
+	//Converts it to a string
+	FString meterString = FString::FromInt(METER);
+
+	FString FULLMETER = FString::FromInt(fullMeter);
+
+	FString meterHUD = meterString + FString(TEXT("/")+ FULLMETER);
+
+	//Finally converts it into a string to then be returned
+	FText meterText = FText::FromString(meterHUD);
+
+	return meterText;
 }
 
 void APlayer1::SetDamageState()
 {
+	//runs after 2 seconds telling the game that the character can be damaged.
+	bCanBeDamaged = true;
+}
+
+void APlayer1::DamageTimer()
+{
+	GetWorldTimerManager().SetTimer(memberTimerHandle, this, &APlayer1::SetDamageState, 2.0f, false);
 }
 
 void APlayer1::SetMeterValue()
 {
+	timelineValue = myTimeline.GetPlaybackPosition();
+
+	curveFloatValue = prevMeterValue + meterValue * meterCurve->GetFloatValue(timelineValue);
+	Meter = curveFloatValue * fullHealth;
+	//Sets the ranges, 0.0f being the lowest and Full Meter being the highest.
+	Meter = FMath::Clamp(Meter, 0.0f, fullMeter);
+	meterPercentage = curveFloatValue;
+	meterPercentage = FMath::Clamp(meterPercentage, 0.0f, 1.0f);
 }
 
 void APlayer1::SetMeterState()
 {
+	//this function runs right after the timeline ends
+
+	canUseMeter = true;
+
+	meterValue = 0.0f;
+
+	UE_LOG(LogTemp, Warning, TEXT("Meter can be used again"));
+
 }
 
 void APlayer1::SetMeterChange(float MeterValue_)
 {
+	canUseMeter = false;
+	prevMeterValue = meterPercentage;
+	meterValue = MeterValue_ / fullMeter;
+
+	if (canUseMeter) {
+		UE_LOG(LogTemp, Warning, TEXT("Magic on CD"));
+	}
+	myTimeline.PlayFromStart();
 }
 
 void APlayer1::UpdateMeter()
 {
+	prevMeterValue = meterPercentage;
+
+	meterPercentage = Meter / fullMeter;
+
+	Meter = 1.0f;
+
+	myTimeline.PlayFromStart();
 }
 
 bool APlayer1::PlayFlash()
 {
+	//If red flash is ever true, it will return true. Otherwise it will return false.
+	if (redFlash) {
+
+		redFlash = false;
+
+		return true;
+	}
 	return false;
 }
 
 void APlayer1::UpdateHealth(float HealthChange_)
 {
+	Health += HealthChange_;
+	Health = FMath::Clamp(Health, 0.0f, fullHealth);
+	healthPercentage = Health / fullHealth;
 }

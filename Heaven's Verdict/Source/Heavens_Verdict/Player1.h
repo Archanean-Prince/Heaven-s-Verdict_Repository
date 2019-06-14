@@ -19,11 +19,8 @@ public:
 	APlayer1();
 
 
-	//The players health value
-	float health = 100;
-
 	//How much meter/special bar they have
-	float meter;
+	float Meter;
 
 
 	//The speed of which the player travels on the X axis
@@ -182,7 +179,7 @@ protected:
 
 	//current % of meter that the player has
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Meter")
-		float MeterPercentage;
+		float meterPercentage;
 
 	//Holds what the previous value for the meter is
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Meter")
@@ -190,7 +187,7 @@ protected:
 
 	//What the current value of the meter is
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Meter")
-		float MeterValue;
+		float meterValue;
 
 	//Pretty sure this is useless to me but it could help determine Invicibility frames
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
@@ -200,7 +197,7 @@ protected:
 
 	//Allows for a "smooth" transition between two values,
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Meter")
-		UCurveFloat *MeterCurve;
+		UCurveFloat* meterCurve;
 
 	//The timeline value that will help make everything go
 	UPROPERTY(EditAnywhere, Category = "Meter")
@@ -208,10 +205,10 @@ protected:
 
 	//The timer for... things. I forgot
 	UPROPERTY(EditAnywhere, Category = "Meter")
-		FTimerHandle memberTimerHandler;
+		FTimerHandle memberTimerHandle;
 
 	//WHat the current float value is b
-	float curveFloatVlaue;
+	float curveFloatValue;
 
 	//Whatever the timeline value us
 	float timelineValue;
@@ -242,6 +239,8 @@ protected:
 	UFUNCTION()
 		void SetDamageState();
 
+	UFUNCTION()
+		void DamageTimer();
 	//Sets the meters current value
 	UFUNCTION()
 		void SetMeterValue();
