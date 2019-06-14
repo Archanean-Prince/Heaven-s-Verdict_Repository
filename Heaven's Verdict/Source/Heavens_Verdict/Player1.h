@@ -5,6 +5,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "Runtime/Engine/Classes/Components/TimelineComponent.h"
 #include "Player1.generated.h"
 
 UCLASS()
@@ -12,6 +13,7 @@ class HEAVENS_VERDICT_API APlayer1 : public APawn
 {
 	GENERATED_BODY()
 
+///Where all the public variables are compiled. Some should be private/protected however...
 public:
 	// Sets default values for this pawn's properties
 	APlayer1();
@@ -68,17 +70,22 @@ public:
 
 	FTimerHandle countdownTimerHandle;
 
+	//What advances the timer
 	void AdvanceTimer();
-	
+
+	//What happens next when the countdown has finished
 	void CountdownHasFinished();
 
+	//Determines how long the hitbox remains active
 	int hitboxLifeSpan = 100;
 
+	//Advances the hitboxes timer
 	void AdvanceHitboxTimer();
 
+	//Returns true when the hitbox has done existin
 	void hitboxFinished();
 
-	bool proximityBlocking = false;
+///Where the components are initialized, protected because of course they are.
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -103,22 +110,24 @@ protected:
 	UPROPERTY(EditAnywhere)
 		FVector hitboxLocation;
 
-	UPROPERTY(EditAnywhere)
-		class UBoxComponent* blockBox;
-
 	//What will allow us to chose what we want to spawn.
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class AFireBall> toSpawn;
 
 	UPROPERTY(EditAnywhere)
 		class UBoxComponent* activeHitbox;
-	
+	/*
 	UPROPERTY(EditAnywhere)
-	TSubclassOf<class AHitbox> hitbox;
+	TSubclassOf<class AHitbox> hitboxInstance;
+	*/
 	UPROPERTY(EditAnywhere)
+		class AHitbox* hitboxInstance;
 
-
+	//Determines whether or not the hitbox has been made or not.
+	UPROPERTY(EditAnywhere)
 	bool isHitboxActive;
+
+///Public methods that everyone should have access to or know of
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -145,15 +154,124 @@ public:
 	//The method that handles the base functionality of the special button. Would be different for each player and made virtual in the future.
 	void specialButton();
 
-	//This method will be called in the blueprint
-	UFUNCTION(BlueprintCallable)
-		void TakeDamage(bool isBlocked_);
 	//Method for the attack hitbox
 	UFUNCTION()
 		void AttackButton();
 
-
 	//Boolean to check if the player wants to airdash left
 	bool airDashLeft;
+
+///Below here is what determines UI functionality
+protected:
+	//Does not blow up! (yet)
+	//Our full health value, can be changed to whatever we want
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
+		float fullHealth;
+
+	//Current health the player has
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
+		float Health;
+
+	//The current % of health that the player has
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
+		float healthPercentage;
+
+	//Whatever the full Meter value is, same as health
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Meter")
+		float fullMeter;
+
+	//current % of meter that the player has
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Meter")
+		float MeterPercentage;
+
+	//Holds what the previous value for the meter is
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Meter")
+		float prevMeterValue;
+
+	//What the current value of the meter is
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Meter")
+		float MeterValue;
+
+	//Pretty sure this is useless to me but it could help determine Invicibility frames
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
+		bool redFlash;
+
+	//Also does not blow up!
+
+	//Allows for a "smooth" transition between two values,
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Meter")
+		UCurveFloat *MeterCurve;
+
+	//The timeline value that will help make everything go
+	UPROPERTY(EditAnywhere, Category = "Meter")
+		FTimeline myTimeline;
+
+	//The timer for... things. I forgot
+	UPROPERTY(EditAnywhere, Category = "Meter")
+		FTimerHandle memberTimerHandler;
+
+	//WHat the current float value is b
+	float curveFloatVlaue;
+
+	//Whatever the timeline value us
+	float timelineValue;
+
+	//Is the player able to use their meter?
+	bool canUseMeter;
+
+	//Get's the players current health
+	UFUNCTION(BlueprintPure, Category = "Health")
+		float GetHealth();
+
+	//Doesn't blow up! Cool!
+	//Get's the health as an integer to then be dispalyed
+	UFUNCTION(BlueprintPure, Category = "Health")
+		FText GetHealthIntText();
+
+	//Gets the meter value
+	UFUNCTION(BlueprintPure, Category = "Meter")
+		float GetMeter();
+
+	//Doesn't blow up! Cool!
+
+	//Then displays it as an integer and then on the UI
+	UFUNCTION(BlueprintPure, Category = "Meter")
+		FText GetMeterIntText();
+
+	//Determines how much damage the player is taking.
+	UFUNCTION()
+		void SetDamageState();
+
+	//Sets the meters current value
+	UFUNCTION()
+		void SetMeterValue();
+
+	//Sets the current meters state,(if usesable or not)
+	UFUNCTION()
+		void SetMeterState();
+
+	//Sets the change to take place,
+	UFUNCTION()
+		void SetMeterChange(float MeterValue_);
+
+	//Updates the meter value to whatever it needs to be
+	UFUNCTION()
+		void UpdateMeter();
+
+	//Plays a red flash upon taking damage, useless to me I think however.
+	UFUNCTION(BlueprintPure, Category = "Health")
+		bool PlayFlash();
+
+	/*
+	UFUNCTION()
+		void ReceivePointDamage(float Damage, const UDamageType* damageType, FVector HitLocation, FVector hitNormal,
+			UPrimitiveComponent* hitComponent, FName boneName, FVector shotFromDirection,
+			AController *instigatedBy, AActor *damageCauser, const FHitResult &hitInfo);
+			Commented out for some reason?
+			*/
+
+	//Updates the health
+	UFUNCTION(BlueprintCallable, Category = "Health")
+		void UpdateHealth(float HealthChange_);
 
 };

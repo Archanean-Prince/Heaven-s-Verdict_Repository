@@ -15,15 +15,16 @@
 #include "FireBall.h"
 #include "Hitbox.h"
 
+
 // Sets default values
 APlayer1::APlayer1()
 {
- 	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
 	//Makes it so that it receives input from the lowest port player
 	AutoPossessPlayer = EAutoReceiveInput::Player0;
-	
+
 	//Creates the root component where everything will be added to
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root Component"));
 
@@ -31,29 +32,23 @@ APlayer1::APlayer1()
 	//Where the hitbox is created, initialized in it's size and then attached to the root component as well.
 	mCollisionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("Hitbox"));
 
-	blockBox = CreateDefaultSubobject<UBoxComponent>(TEXT("BlockBox"));
-
-	RootComponent->SetupAttachment(blockBox);
-
-	blockBox->InitBoxExtent(FVector(80, 80, 70));
-
-	blockBox->ComponentHasTag(FName("BlockBox"));
-	
 
 	RootComponent->SetupAttachment(mCollisionBox);
 
 	mCollisionBox->InitBoxExtent(FVector(40, 40, 40));
 
-	blockBox->SetupAttachment(mCollisionBox);
-
 	//Where the mesh is initialized, and then attached to the root component
 	myMesh = CreateAbstractDefaultSubobject<UStaticMeshComponent>(TEXT("Static Mesh Component"));
+
 	myMesh->SetupAttachment(RootComponent);
+
 	//This line also makes it auto spawn with the basic cube found within the starter assets.
 	myMesh->SetStaticMesh((ConstructorHelpers::FObjectFinderOptional<UStaticMesh>
 		(TEXT("/Game/StarterContent/Shapes/Shape_Cube.Shape_Cube"))).Get());
+
 	//The line below makes sure it's in the center of the root component.
 	myMesh->SetRelativeLocation(FVector().ZeroVector);
+
 	myMesh->SetRelativeLocation(FVector(0, 0, -40));
 	//X,Y,Z. X is Horizontal, Y is forward and Z is up and down.
 	mCollisionBox->ComponentHasTag(FName("Player"));
@@ -66,24 +61,45 @@ APlayer1::APlayer1()
 
 	//Sets up the camera to be a specific distance away. Yet to function properly like a normal fighter
 	theCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+
 	theCamera->SetupAttachment(RootComponent);
+
 	theCamera->SetRelativeLocation(FVector(-640.0f, 450.0f, 130.0f));
-	
+
 
 	mCollisionBox->ComponentTags.Add(FName("Player"));
 	//Make sure this parts go last part go last!
 	RootComponent = mCollisionBox;
 
-}
+	//Tentative code below! High chance to explode!
 
+	//Whatever the full value is, can be increased beyond this to simulate "armor" so that the % amount of health loss is less!
+	fullHealth = 1000.0f;
+
+	//Your health is full at the start of it
+	health = fullHealth;
+
+	//Is one to represent full health
+	healthPercentage = 1;
+
+
+
+
+
+}
 
 // Called when the game starts or when spawned
 void APlayer1::BeginPlay()
 {
+	isHitboxActive = true;
 
+	AHitbox* staticHitbox = GetWorld()->SpawnActor<AHitbox>();
+	
+	staticHitbox = hitboxInstance;
+
+	//AHitbox* myHitbox = NewObject<AHitbox>(AHitbox::StaticClass());
 	Super::BeginPlay();
 }
-
 
 // Called every frame
 void APlayer1::Tick(float DeltaTime)
@@ -91,6 +107,7 @@ void APlayer1::Tick(float DeltaTime)
 
 	Super::Tick(DeltaTime);
 	
+	//PrintOnScreen(1);
 	
 	if (GEngine) {
 		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, FString::Printf(TEXT("Player Location: %s"), *playerLocation.ToString()));
@@ -185,10 +202,6 @@ void APlayer1::OnOverlapBegin(UPrimitiveComponent * OverlappedComp, AActor * Oth
 		//UE_LOG(LogTemp, Warning, TEXT("Oh shit we collided with something"));
 	}
 	if (OtherComp->ComponentHasTag("fireball")) {
-		
-		
-		//HIGHLY EXPERIMENTAL LINE BELOW
-		//currentVelocity.Y = FMath::Clamp(defaultValue, -40.0f, 1.0f) * -1000.0f;
 	}
 
 
@@ -229,6 +242,7 @@ void APlayer1::AirDash() {
 
 void APlayer1::AirDashB()
 {
+	
 	if (canAirdash == true) {
 		isAirdashing = true;
 		airDashLeft = true;
@@ -248,7 +262,6 @@ void APlayer1::specialButton()
 
 	if (!isFacingLeft) {
 		//All the code below generates the spawn points for the fireball and the hitbox itself
-
 
 		fireballSpawn.Y = playerLocation.Y + 150;
 
@@ -282,11 +295,6 @@ void APlayer1::specialButton()
 	}
 	//UE_LOG(LogTemp, Warning, TEXT("Special button pressed!"));
 }
-
-void APlayer1::TakeDamage(bool isBlocked)
-{
-	
-}
 	
 void APlayer1::AdvanceTimer()
 {
@@ -305,21 +313,29 @@ void APlayer1::CountdownHasFinished()
 
 
 void APlayer1::AttackButton() {
+	//First gets the player location
 	playerLocation = GetActorLocation();
-
+	
+	//Sets the current hitbox instance to be true and thus active
+	hitboxInstance->isActive = true;
+	
 	if (isHitboxActive) {
+		//Below is what would be theoretically used if the player faced left or right
 		if (!isFacingLeft) {
 			//All the code below generates the spawn points for the fireball and the hitbox itself
-			hitboxLocation.Y = playerLocation.Y + 100;
+			hitboxInstance->SetActorLocation(FVector(GetActorLocation().X-30,GetActorLocation().Y+100,GetActorLocation().Z));
+
+			//= playerLocation.Y + 100;
 
 			hitboxLocation.X = playerLocation.X - 30;
 
 			hitboxLocation.Z = playerLocation.Z;
 
-			DrawDebugBox(GetWorld(), hitboxLocation, FVector(45,45,45), FColor::Blue, false, 0.5f, 0, 2);
-		}
+			//DrawDebugBox(GetWorld(), hitboxLocation, FVector(45,45,45), FColor::Blue, false, 0.5f, 0, 2);
 
-		AHitbox* activeHitbox = GetWorld()->SpawnActor<AHitbox>(hitbox, hitboxLocation, FRotator::ZeroRotator);
+		}
+		
+		//AHitbox* activeHitbox = GetWorld()->SpawnActor<AHitbox>(hitbox, hitboxLocation, FRotator::ZeroRotator);
 		//UE_LOG(LogTemp, Warning, TEXT("Punch!"));
 	}
 	else {
@@ -339,4 +355,55 @@ void APlayer1::AdvanceHitboxTimer()
 void APlayer1::hitboxFinished()
 {
 	isHitboxActive = true;
+}
+
+
+
+float APlayer1::GetHealth()
+{
+	return 0.0f;
+}
+
+FText APlayer1::GetHealthIntText()
+{
+	return FText();
+}
+
+float APlayer1::GetMeter()
+{
+	return 0.0f;
+}
+
+FText APlayer1::GetMeterIntText()
+{
+	return FText();
+}
+
+void APlayer1::SetDamageState()
+{
+}
+
+void APlayer1::SetMeterValue()
+{
+}
+
+void APlayer1::SetMeterState()
+{
+}
+
+void APlayer1::SetMeterChange(float MeterValue_)
+{
+}
+
+void APlayer1::UpdateMeter()
+{
+}
+
+bool APlayer1::PlayFlash()
+{
+	return false;
+}
+
+void APlayer1::UpdateHealth(float HealthChange_)
+{
 }
